@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Calm Harmony -->
     <!-- Application Structure Plan: A thematic dashboard structure is used. This non-linear approach allows users to get a high-level overview and then dive into specific areas of interest (Prevalence, Profiles, Predictors, Impact, etc.) via a sticky navigation bar. This is more engaging and user-directed than a linear report format. The key finding of the 'Asymmetrical Victim' is highlighted upfront to immediately convey the report's core insight. Each section uses interactive visualizations to make complex data, like regression or clustering, accessible and explorable, enhancing user understanding and engagement. A new 'Risk Calculator' section makes the findings personally relevant. -->
-    <!-- Visualization & Content Choices: The application uses Chart.js for all visualizations on Canvas, strictly avoiding SVG/Mermaid. 1. Prevalence (Goal: Inform): Grouped bar chart. 2. PCA Patterns (Goal: Organize): Styled HTML lists to clearly present component loadings. 3. Predictors (Goal: Compare): An interactive horizontal bar chart for odds ratios. 4. Profiles (Goal: Organize): A dynamic radar chart. 5. Impact (Goal: Relationships): A bubble chart for correlation and a bar chart for specific impact prevalence. 6. Negotiation (Goal: Inform): A line chart showing the protective effect. 7. Risk Calculator (Goal: Personalize): An interactive form that uses regression coefficients to provide a personalized risk assessment. Gemini API features added for de-escalation scenarios and personalized support resources, with a new API key manager for portability. -->
+    <!-- Visualization & Content Choices: The application uses Chart.js for all visualizations on Canvas, strictly avoiding SVG/Mermaid. 1. Prevalence (Goal: Inform): Grouped bar chart. 2. PCA Patterns (Goal: Organize): Styled HTML lists to clearly present component loadings. 3. Predictors (Goal: Compare): An interactive horizontal bar chart for odds ratios. 4. Profiles (Goal: Organize): A dynamic radar chart. 5. Impact (Goal: Relationships): An interactive bubble chart for correlation and a bar chart for specific impact prevalence. 6. Negotiation (Goal: Inform): A line chart showing the protective effect. 7. Risk Calculator (Goal: Personalize): An interactive form that uses regression coefficients to provide a personalized risk assessment. Gemini API features added for de-escalation scenarios and personalized support resources, with a new API key manager for portability. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
@@ -108,6 +108,11 @@
         }
         #settings-btn.key-not-set {
             color: #DC2626;
+        }
+        .filter-btn.active {
+            background-color: #F97316;
+            color: white;
+            border-color: #F97316;
         }
     </style>
 </head>
@@ -362,6 +367,11 @@
                 <p class="max-w-2xl mx-auto text-stone-600 mt-2">
                     Dating violence has severe consequences. These visualizations show both the correlation between violence types and their negative impact, as well as the prevalence of specific, tangible consequences reported by students.
                 </p>
+                <div class="mt-4 flex justify-center space-x-2">
+                    <button data-filter="victimization" class="impact-filter-btn filter-btn active px-4 py-1 rounded-md text-sm border">Victimization</button>
+                    <button data-filter="perpetration" class="impact-filter-btn filter-btn px-4 py-1 rounded-md text-sm border">Perpetration</button>
+                    <button data-filter="all" class="impact-filter-btn filter-btn px-4 py-1 rounded-md text-sm border">All</button>
+                </div>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center px-4">
                 <div class="chart-container h-96 max-h-[500px]">
@@ -472,11 +482,18 @@
                     sexPerp: { labels: ['Gender (Male)', "Father's Ed. Level"], values: [1.991, 1.723] },
                 },
                 impact: {
-                    correlation: [
-                        { label: 'Psychological Victimization', data: [{ x: 0.75, y: 0.75, r: 68 }], backgroundColor: 'rgba(59, 130, 246, 0.7)'},
-                        { label: 'Physical Victimization', data: [{ x: 0.68, y: 0.68, r: 33 }], backgroundColor: 'rgba(239, 68, 68, 0.7)' },
-                        { label: 'Sexual Victimization', data: [{ x: 0.62, y: 0.62, r: 32.5 }], backgroundColor: 'rgba(139, 92, 246, 0.7)' },
-                    ],
+                    correlation: {
+                        victimization: [
+                            { label: 'Psychological Victimization', data: [{ x: 0.75, y: 0.75, r: 68 }], backgroundColor: 'rgba(59, 130, 246, 0.7)'},
+                            { label: 'Physical Victimization', data: [{ x: 0.68, y: 0.68, r: 33 }], backgroundColor: 'rgba(239, 68, 68, 0.7)' },
+                            { label: 'Sexual Victimization', data: [{ x: 0.62, y: 0.62, r: 32.5 }], backgroundColor: 'rgba(139, 92, 246, 0.7)' },
+                        ],
+                        perpetration: [
+                            { label: 'Psychological Perpetration', data: [{ x: 0.41, y: 0.41, r: 65 }], backgroundColor: 'rgba(59, 130, 246, 0.3)'},
+                            { label: 'Physical Perpetration', data: [{ x: 0.45, y: 0.45, r: 22.5 }], backgroundColor: 'rgba(239, 68, 68, 0.3)' },
+                            { label: 'Sexual Perpetration', data: [{ x: 0.39, y: 0.39, r: 25 }], backgroundColor: 'rgba(139, 92, 246, 0.3)' },
+                        ]
+                    },
                     details: {
                         labels: ['Lost Self-Confidence', 'Could Not Concentrate', 'Grades Dropped', 'Increased Fear/Anxiety'],
                         values: [55, 48, 42, 65]
@@ -578,7 +595,7 @@
                 const ctx = document.getElementById('impactCorrelationChart').getContext('2d');
                 impactCorrelationChart = new Chart(ctx, {
                     type: 'bubble',
-                    data: { datasets: data.impact.correlation },
+                    data: { datasets: data.impact.correlation.victimization },
                     options: {
                         responsive: true, maintainAspectRatio: false,
                         plugins: {
@@ -873,6 +890,25 @@
                     hideGeminiModal();
                 }
             });
+
+            document.querySelectorAll('.impact-filter-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const filter = e.target.dataset.filter;
+                    
+                    if (filter === 'victimization') {
+                        impactCorrelationChart.data.datasets = data.impact.correlation.victimization;
+                    } else if (filter === 'perpetration') {
+                        impactCorrelationChart.data.datasets = data.impact.correlation.perpetration;
+                    } else {
+                        impactCorrelationChart.data.datasets = [...data.impact.correlation.victimization, ...data.impact.correlation.perpetration];
+                    }
+                    impactCorrelationChart.update();
+
+                    document.querySelectorAll('.impact-filter-btn').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                });
+            });
+
 
             updateSettingsIcon();
             createPrevalenceChart();
