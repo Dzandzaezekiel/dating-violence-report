@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Calm Harmony -->
     <!-- Application Structure Plan: A thematic dashboard structure is used. This non-linear approach allows users to get a high-level overview and then dive into specific areas of interest (Prevalence, Profiles, Predictors, Impact, etc.) via a sticky navigation bar. This is more engaging and user-directed than a linear report format. The key finding of the 'Asymmetrical Victim' is highlighted upfront to immediately convey the report's core insight. Each section uses interactive visualizations to make complex data, like regression or clustering, accessible and explorable, enhancing user understanding and engagement. A new 'Risk Calculator' section makes the findings personally relevant. -->
-    <!-- Visualization & Content Choices: The application uses Chart.js for all visualizations on Canvas, strictly avoiding SVG/Mermaid. 1. Prevalence (Goal: Inform): Grouped bar chart. 2. PCA Patterns (Goal: Organize): Styled HTML lists to clearly present component loadings. 3. Predictors (Goal: Compare): An interactive horizontal bar chart for odds ratios. 4. Profiles (Goal: Organize): A dynamic radar chart. 5. Impact (Goal: Relationships): A bubble chart for correlation and a bar chart for specific impact prevalence. 6. Negotiation (Goal: Inform): A line chart showing the protective effect. 7. Risk Calculator (Goal: Personalize): An interactive form that uses regression coefficients to provide a personalized risk assessment. Gemini API features added for de-escalation scenarios and personalized support resources. -->
+    <!-- Visualization & Content Choices: The application uses Chart.js for all visualizations on Canvas, strictly avoiding SVG/Mermaid. 1. Prevalence (Goal: Inform): Grouped bar chart. 2. PCA Patterns (Goal: Organize): Styled HTML lists to clearly present component loadings. 3. Predictors (Goal: Compare): An interactive horizontal bar chart for odds ratios. 4. Profiles (Goal: Organize): A dynamic radar chart. 5. Impact (Goal: Relationships): A bubble chart for correlation and a bar chart for specific impact prevalence. 6. Negotiation (Goal: Inform): A line chart showing the protective effect. 7. Risk Calculator (Goal: Personalize): An interactive form that uses regression coefficients to provide a personalized risk assessment. Gemini API features added for de-escalation scenarios and personalized support resources, with a new API key manager for portability. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
@@ -103,6 +103,12 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        #settings-btn.key-set {
+            color: #16A34A;
+        }
+        #settings-btn.key-not-set {
+            color: #DC2626;
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -110,10 +116,10 @@
     <header id="home" class="sticky top-0 bg-white/80 backdrop-blur-md z-50 shadow-sm">
         <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
-                <div class="flex-shrink-0">
+                <div class="flex items-center">
                     <h1 class="text-xl font-bold text-stone-800">DV Analysis | UoG</h1>
                 </div>
-                <div class="hidden md:block">
+                <div class="hidden md:flex items-center">
                     <div class="ml-10 flex items-baseline space-x-4">
                         <a href="#participants" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Participants</a>
                         <a href="#overview" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Overview</a>
@@ -124,6 +130,9 @@
                         <a href="#impact" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Impact</a>
                         <a href="#solutions" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Solutions</a>
                     </div>
+                    <button id="settings-btn" title="API Key Settings" class="ml-4 p-2 rounded-full hover:bg-stone-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+                        <span class="text-2xl">⚙️</span>
+                    </button>
                 </div>
             </div>
         </nav>
@@ -417,6 +426,25 @@
             <button id="close-modal-btn" class="mt-6 w-full bg-stone-500 text-white font-bold py-2 px-4 rounded-md hover:bg-stone-600 transition-colors">Close</button>
         </div>
     </div>
+    
+    <div id="api-key-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Set Your Gemini API Key</h3>
+            <p class="text-sm text-stone-600 mb-4">To use the AI-powered features, you need to provide your own Gemini API key. This key is saved securely in your browser's local storage and is never shared.</p>
+            <div>
+                <label for="api-key-input" class="block text-sm font-medium text-stone-700">Gemini API Key</label>
+                <input type="password" id="api-key-input" class="mt-1 block w-full p-2 border border-stone-300 rounded-md" placeholder="Enter your API key">
+            </div>
+            <p class="text-xs text-stone-500 mt-2">
+                You can get a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Google AI Studio</a>.
+            </p>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancel-api-key-btn" class="bg-stone-200 text-stone-800 font-bold py-2 px-4 rounded-md hover:bg-stone-300 transition-colors">Cancel</button>
+                <button id="save-api-key-btn" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-md hover:bg-orange-600 transition-colors">Save Key</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -716,30 +744,68 @@
                 });
             });
 
-            const modal = document.getElementById('gemini-modal');
+            const geminiModal = document.getElementById('gemini-modal');
             const modalTitle = document.getElementById('modal-title');
             const modalBody = document.getElementById('modal-body');
             const closeModalBtn = document.getElementById('close-modal-btn');
 
-            function showModal(title, content) {
+            function showGeminiModal(title, content) {
                 modalTitle.textContent = title;
                 modalBody.innerHTML = content;
-                modal.classList.add('visible');
+                geminiModal.classList.add('visible');
             }
 
-            function hideModal() {
-                modal.classList.remove('visible');
+            function hideGeminiModal() {
+                geminiModal.classList.remove('visible');
             }
             
-            closeModalBtn.addEventListener('click', hideModal);
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    hideModal();
+            closeModalBtn.addEventListener('click', hideGeminiModal);
+            geminiModal.addEventListener('click', (e) => {
+                if (e.target === geminiModal) {
+                    hideGeminiModal();
                 }
             });
             
+            const apiKeyModal = document.getElementById('api-key-modal');
+            const settingsBtn = document.getElementById('settings-btn');
+            const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+            const cancelApiKeyBtn = document.getElementById('cancel-api-key-btn');
+            const apiKeyInput = document.getElementById('api-key-input');
+
+            function showApiKeyModal() {
+                apiKeyInput.value = localStorage.getItem('geminiApiKey') || '';
+                apiKeyModal.classList.add('visible');
+            }
+
+            function hideApiKeyModal() {
+                apiKeyModal.classList.remove('visible');
+            }
+
+            function updateSettingsIcon() {
+                if(localStorage.getItem('geminiApiKey')) {
+                    settingsBtn.classList.remove('key-not-set');
+                    settingsBtn.classList.add('key-set');
+                } else {
+                    settingsBtn.classList.remove('key-set');
+                    settingsBtn.classList.add('key-not-set');
+                }
+            }
+
+            settingsBtn.addEventListener('click', showApiKeyModal);
+            cancelApiKeyBtn.addEventListener('click', hideApiKeyModal);
+            saveApiKeyBtn.addEventListener('click', () => {
+                localStorage.setItem('geminiApiKey', apiKeyInput.value);
+                updateSettingsIcon();
+                hideApiKeyModal();
+            });
+
             async function callGeminiAPI(prompt) {
-                const apiKey = ""; // API key will be injected by the environment
+                const apiKey = localStorage.getItem('geminiApiKey');
+                if (!apiKey) {
+                    showApiKeyModal();
+                    return null;
+                }
+                
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
                 
                 const payload = {
@@ -772,7 +838,7 @@
                     }
                 } catch (error) {
                     console.error("Error calling Gemini API:", error);
-                    return "An error occurred while fetching data. Please check the console for details.";
+                    return "An error occurred while fetching data. Your API key may be invalid. Please check the console for details.";
                 }
             }
 
@@ -785,9 +851,13 @@
 
                 const prompt = `You are a relationship counselor. A university student is in a conflict with their partner. The situation is: "${scenarioText}". Generate three different examples of calm, respectful, and non-accusatory phrases the student can use to start a conversation about this issue. Use 'I' statements. Format the output as a numbered list within HTML list tags (<li>).`;
                 
-                showModal('AI-Generated Phrases', '<div class="loader mx-auto"></div><p class="text-center mt-2">Generating advice...</p>');
+                showGeminiModal('AI-Generated Phrases', '<div class="loader mx-auto"></div><p class="text-center mt-2">Generating advice...</p>');
                 const responseText = await callGeminiAPI(prompt);
-                showModal('AI-Generated Phrases', `<p class="mb-4">Here are some ways you could start the conversation:</p><ul class="list-disc list-inside space-y-2">${responseText}</ul>`);
+                if(responseText) {
+                    showGeminiModal('AI-Generated Phrases', `<p class="mb-4">Here are some ways you could start the conversation:</p><ul class="list-disc list-inside space-y-2">${responseText}</ul>`);
+                } else {
+                    hideGeminiModal();
+                }
             });
 
             document.getElementById('find-support-btn').addEventListener('click', async () => {
@@ -795,12 +865,16 @@
 
                 const prompt = `A university student in Accra, Ghana has been identified as having a ${lastCalculatedRisk} risk of experiencing dating violence. Based on their situation, generate a supportive message and a list of 3-4 specific, actionable resources available to students at the University of Ghana or in Accra. Include contact information for the University Counseling Centre and one external NGO like the Ark Foundation or DOVVSU. Frame the response as encouraging and non-judgmental. Format the entire output in HTML, using headings (<h4>) for sections and unordered lists (<ul>) for the resources.`;
                 
-                showModal('Support Resources', '<div class="loader mx-auto"></div><p class="text-center mt-2">Finding resources...</p>');
+                showGeminiModal('Support Resources', '<div class="loader mx-auto"></div><p class="text-center mt-2">Finding resources...</p>');
                 const responseText = await callGeminiAPI(prompt);
-                showModal('Support Resources', responseText);
+                if(responseText) {
+                    showGeminiModal('Support Resources', responseText);
+                } else {
+                    hideGeminiModal();
+                }
             });
 
-
+            updateSettingsIcon();
             createPrevalenceChart();
             createProfilesChart();
             createPredictorsChart();
