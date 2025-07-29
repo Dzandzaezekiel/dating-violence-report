@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Report: Dating Violence at the University of Ghana</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: A thematic dashboard structure is used. This non-linear approach allows users to get a high-level overview and then dive into specific areas of interest (Prevalence, Profiles, Predictors, Impact, etc.) via a sticky navigation bar. This is more engaging and user-directed than a linear report format. The key finding of the 'Asymmetrical Victim' is highlighted upfront to immediately convey the report's core insight. Each section uses interactive visualizations to make complex data, like regression or clustering, accessible and explorable, enhancing user understanding and engagement. A new 'Risk Calculator' section makes the findings personally relevant. -->
+    <!-- Visualization & Content Choices: The application uses Chart.js for all visualizations on Canvas, strictly avoiding SVG/Mermaid. 1. Prevalence (Goal: Inform): Grouped bar chart. 2. PCA Patterns (Goal: Organize): Styled HTML lists to clearly present component loadings. 3. Predictors (Goal: Compare): An interactive horizontal bar chart for odds ratios. 4. Profiles (Goal: Organize): A dynamic radar chart. 5. Impact (Goal: Relationships): A bubble chart for correlation and a bar chart for specific impact prevalence. 6. Negotiation (Goal: Inform): A line chart showing the protective effect. 7. Risk Calculator (Goal: Personalize): An interactive form that uses regression coefficients to provide a personalized risk assessment. Gemini API features added for de-escalation scenarios and personalized support resources. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F5F4; /* stone-100 */
+            color: #44403C; /* stone-700 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+        }
+        .nav-link.active {
+            color: #F97316; /* orange-500 */
+            border-bottom: 2px solid #F97316;
+        }
+        .card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .cluster-card.active {
+            border-color: #F97316; /* orange-500 */
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.4);
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        .risk-low { color: #16A34A; } /* green-600 */
+        .risk-moderate { color: #F97316; } /* orange-500 */
+        .risk-high { color: #DC2626; } /* red-600 */
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #F97316;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header id="home" class="sticky top-0 bg-white/80 backdrop-blur-md z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-stone-800">DV Analysis | UoG</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#participants" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Participants</a>
+                        <a href="#overview" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Overview</a>
+                        <a href="#profiles" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Profiles</a>
+                        <a href="#patterns" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Patterns</a>
+                        <a href="#predictors" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Predictors</a>
+                        <a href="#calculator" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Risk Calculator</a>
+                        <a href="#impact" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Impact</a>
+                        <a href="#solutions" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 hover:text-orange-500">Solutions</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <section class="text-center mb-16">
+            <h2 class="text-3xl md:text-4xl font-bold text-stone-800 mb-4">Dating Violence on Campus: An Interactive Analysis</h2>
+            <p class="max-w-3xl mx-auto text-stone-600 mb-6">
+                This interactive report synthesizes findings on dating violence among University of Ghana students. It moves beyond static tables to reveal the complex patterns of victimization, perpetration, and impact, providing data-driven insights for awareness and intervention.
+            </p>
+            <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg max-w-2xl mx-auto text-left">
+                <h3 class="font-bold text-orange-800">Key Finding: The "Asymmetrical Victim"</h3>
+                <p class="text-orange-700 mt-1">
+                    A critical discovery is a significant group of students (**20%** of the sample, **85%** of whom are female) who experience high levels of psychological, physical, and sexual violence but report perpetrating almost none. This challenges the notion of "mutual" violence and highlights the need for victim-centric support.
+                </p>
+            </div>
+        </section>
+
+        <section id="participants" class="py-12 bg-stone-50 rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">About the Study Participants</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    The findings in this report are based on a survey of 599 undergraduate students from the University of Ghana, representing a diverse cross-section of the campus community.
+                </p>
+            </div>
+            <div class="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center px-4">
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <p class="text-3xl font-bold text-orange-500">599</p>
+                    <p class="text-sm text-stone-600">Total Participants</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <p class="text-3xl font-bold text-orange-500">54.4%</p>
+                    <p class="text-sm text-stone-600">Female</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <p class="text-3xl font-bold text-orange-500">50.4%</p>
+                    <p class="text-sm text-stone-600">Aged 21-23</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <p class="text-3xl font-bold text-orange-500">59.9%</p>
+                    <p class="text-sm text-stone-600">Faculty of Humanities</p>
+                </div>
+            </div>
+            <div class="max-w-3xl mx-auto text-center mt-8 px-4">
+                <p class="text-stone-700 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    Of the 599 total participants, <strong>418</strong> reported being currently or previously in a romantic relationship. The subsequent analyses on dating violence focus specifically on this group. The remaining <strong>181</strong> students who had never been in a relationship were excluded from the violence-specific analysis.
+                </p>
+            </div>
+        </section>
+
+        <section id="overview" class="py-12 bg-white rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">The Scale of the Problem</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    Psychological aggression is the most common form of dating violence, creating a normative environment where more severe abuse can develop. This chart shows the percentage of students who reported experiencing (victimization) or committing (perpetration) at least one act of violence in the past year.
+                </p>
+            </div>
+            <div class="chart-container">
+                <canvas id="prevalenceChart"></canvas>
+            </div>
+        </section>
+
+        <section id="profiles" class="py-12 bg-stone-50 rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">Student Profiles: Four Distinct Experiences</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    Not all experiences with dating violence are the same. Clustering analysis revealed four distinct student profiles. Click on a profile below to see its unique pattern of victimization and perpetration and learn about its characteristics.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-4 mb-8">
+                <div id="cluster-1" class="cluster-card active cursor-pointer p-4 border-2 border-transparent rounded-lg bg-white text-center card">
+                    <h4 class="font-bold">Low-Involvement</h4>
+                    <p class="text-sm text-stone-500">45% of students</p>
+                </div>
+                <div id="cluster-2" class="cluster-card cursor-pointer p-4 border-2 border-transparent rounded-lg bg-white text-center card">
+                    <h4 class="font-bold">Asymmetrical Victim</h4>
+                    <p class="text-sm text-stone-500">20% of students</p>
+                </div>
+                <div id="cluster-3" class="cluster-card cursor-pointer p-4 border-2 border-transparent rounded-lg bg-white text-center card">
+                    <h4 class="font-bold">Mutual Psychological</h4>
+                    <p class="text-sm text-stone-500">25% of students</p>
+                </div>
+                <div id="cluster-4" class="cluster-card cursor-pointer p-4 border-2 border-transparent rounded-lg bg-white text-center card">
+                    <h4 class="font-bold">Severe-Combined</h4>
+                    <p class="text-sm text-stone-500">10% of students</p>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row items-center gap-8 px-4">
+                <div class="w-full md:w-1/2">
+                    <div class="chart-container h-80 md:h-96">
+                        <canvas id="profilesChart"></canvas>
+                    </div>
+                </div>
+                <div class="w-full md:w-1/2">
+                    <div id="profile-description" class="bg-white p-6 rounded-lg shadow-inner">
+                        <h4 id="profile-title" class="text-xl font-bold text-stone-800 mb-2"></h4>
+                        <p id="profile-text" class="text-stone-600"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="patterns" class="py-12 mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">Unpacking Violence: Key Behavioral Patterns</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    "Violence" is a broad term. Principal Component Analysis (PCA) helps identify the specific, underlying clusters of behaviors that students experience. This reveals that violence isn't random; it follows distinct patterns.
+                </p>
+            </div>
+            <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h4 class="font-bold text-lg text-blue-600 mb-2">Victimization Pattern: Psychological Control & Stalking</h4>
+                    <p class="text-stone-600 mb-4">This pattern moves beyond simple insults. It's a coherent set of behaviors used to isolate and control a partner. Key indicators include:</p>
+                    <ul class="list-disc list-inside space-y-2 text-stone-700">
+                        <li>Partner was jealous or suspicious of friends.</li>
+                        <li>Partner did not allow respondent to make their own decisions.</li>
+                        <li>Partner stalked or had the respondent followed.</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h4 class="font-bold text-lg text-orange-600 mb-2">Perpetration Pattern: Aggression with Blame Externalization</h4>
+                    <p class="text-stone-600 mb-4">This pattern links physical aggression with a cognitive distortion used to justify it. Key indicators include:</p>
+                    <ul class="list-disc list-inside space-y-2 text-stone-700">
+                        <li>Respondent blamed their partner for causing their violent behavior.</li>
+                        <li>Respondent pushed or shoved their partner.</li>
+                        <li>Respondent insulted or swore at their partner.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="predictors" class="py-12 bg-white rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">Who is Affected? Key Predictors of Violence</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    Certain demographic and behavioral factors increase the risk of involvement in dating violence. This chart displays results from logistic regression, showing how different factors increase the odds of violence occurring. Use the dropdown to explore what drives victimization versus perpetration.
+                </p>
+                <div class="mt-4">
+                    <select id="predictor-selector" class="p-2 border rounded-md bg-white">
+                        <option value="psychVic">Predicting Psychological Victimization</option>
+                        <option value="physVic">Predicting Physical Victimization</option>
+                        <option value="sexVic">Predicting Sexual Victimization</option>
+                        <option value="physPerp">Predicting Physical Perpetration</option>
+                        <option value="sexPerp">Predicting Sexual Perpetration</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="predictorsChart"></canvas>
+            </div>
+        </section>
+
+        <section id="calculator" class="py-12 bg-stone-50 rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">Personalized Risk Assessment</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    This calculator uses the study's regression models to provide a personalized risk estimation. This is for educational purposes only and is not a clinical diagnosis.
+                </p>
+            </div>
+            <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 px-4">
+                <div id="calculator-form" class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                    <div>
+                        <label for="calc-gender" class="block text-sm font-medium text-stone-700">Your Gender</label>
+                        <select id="calc-gender" class="mt-1 block w-full p-2 border border-stone-300 rounded-md">
+                            <option value="0">Female</option>
+                            <option value="1">Male</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="calc-father-ed" class="block text-sm font-medium text-stone-700">Father's Highest Education</label>
+                        <select id="calc-father-ed" class="mt-1 block w-full p-2 border border-stone-300 rounded-md">
+                            <option value="0">No Formal Education</option>
+                            <option value="1">High School or Below</option>
+                            <option value="2">Tertiary Degree</option>
+                            <option value="3">Postgraduate</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="calc-mother-ed" class="block text-sm font-medium text-stone-700">Mother's Highest Education</label>
+                        <select id="calc-mother-ed" class="mt-1 block w-full p-2 border border-stone-300 rounded-md">
+                            <option value="0">No Formal Education</option>
+                            <option value="1">High School or Below</option>
+                            <option value="2">Tertiary Degree</option>
+                            <option value="3">Postgraduate</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="calc-duration" class="block text-sm font-medium text-stone-700">Relationship Duration</label>
+                        <select id="calc-duration" class="mt-1 block w-full p-2 border border-stone-300 rounded-md">
+                            <option value="0">Less than 1 year</option>
+                            <option value="1">1-2 years</option>
+                            <option value="2">3-4 years</option>
+                            <option value="3">5+ years</option>
+                        </select>
+                    </div>
+                     <button id="calculate-risk-btn" class="w-full bg-orange-500 text-white font-bold py-2 px-4 rounded-md hover:bg-orange-600 transition-colors">Calculate Risk</button>
+                </div>
+                <div id="risk-results" class="bg-white p-6 rounded-lg shadow-inner">
+                    <h4 class="font-bold text-lg text-stone-800 mb-4">Your Estimated Victimization Risk Profile</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <p class="font-semibold">Psychological Violence Risk:</p>
+                            <p id="risk-psych" class="text-lg font-bold">--</p>
+                        </div>
+                        <div>
+                            <p class="font-semibold">Physical Violence Risk:</p>
+                            <p id="risk-phys" class="text-lg font-bold">--</p>
+                        </div>
+                        <div>
+                            <p class="font-semibold">Sexual Violence Risk:</p>
+                            <p id="risk-sex" class="text-lg font-bold">--</p>
+                        </div>
+                    </div>
+                    <div id="risk-implications" class="mt-4 pt-4 border-t border-stone-200 text-sm text-stone-600">
+                        <p>Enter your information to see your personalized risk profile and recommendations.</p>
+                    </div>
+                     <button id="find-support-btn" class="hidden mt-4 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">✨ Find Support Resources</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="impact" class="py-12 bg-white rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">The Ripple Effect: Quantifying the Impact</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    Dating violence has severe consequences. These visualizations show both the correlation between violence types and their negative impact, as well as the prevalence of specific, tangible consequences reported by students.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center px-4">
+                <div class="chart-container h-96 max-h-[500px]">
+                    <canvas id="impactCorrelationChart"></canvas>
+                </div>
+                <div class="chart-container h-96 max-h-[500px]">
+                    <canvas id="impactDetailsChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="solutions" class="py-12 bg-stone-50 rounded-xl shadow-md mb-12">
+            <div class="text-center mb-8 px-4">
+                <h3 class="text-2xl font-bold text-stone-800">Pathways to Prevention: The Power of Negotiation</h3>
+                <p class="max-w-2xl mx-auto text-stone-600 mt-2">
+                    Amid the challenges, the data offers a clear, hopeful insight: constructive communication is a powerful protective factor. This chart shows that as students' use of positive negotiation strategies increases, their involvement in violence (both perpetration and victimization) significantly decreases.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center px-4">
+                <div class="chart-container">
+                    <canvas id="solutionsChart"></canvas>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h4 class="font-bold text-lg text-green-700 mb-2">✨ De-escalation Scenario Generator</h4>
+                    <p class="text-stone-600 mb-4">Knowing what to say is hard. Select a common conflict scenario and get AI-generated examples of how to start a constructive conversation.</p>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="scenario-selector" class="block text-sm font-medium text-stone-700">Select a Scenario:</label>
+                            <select id="scenario-selector" class="mt-1 block w-full p-2 border border-stone-300 rounded-md">
+                                <option value="jealousy">My partner is jealous of my friends</option>
+                                <option value="disagreement">We disagreed on future plans</option>
+                                <option value="criticism">My partner criticized my appearance</option>
+                            </select>
+                        </div>
+                        <button id="generate-phrases-btn" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-colors">Generate Phrases</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="limitations" class="py-12">
+            <div class="max-w-3xl mx-auto text-center">
+                <h3 class="text-2xl font-bold text-stone-800">Study Limitations</h3>
+                <p class="text-stone-600 mt-2">
+                    Every strong research report acknowledges its limitations. This study relies on self-reported data, which can be influenced by memory recall and social desirability bias. Furthermore, the cross-sectional design captures a single point in time, meaning we can identify strong associations but cannot prove causation. These factors are important for a nuanced interpretation of the findings.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-stone-800 text-white mt-12">
+        <div class="container mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
+            <p>This interactive report is based on data from the "Prevalence of Dating Violence Among University of Ghana Undergraduate Students" study.</p>
+            <p class="text-stone-400 mt-1">Application designed for educational and awareness purposes.</p>
+        </div>
+    </footer>
+
+    <div id="gemini-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
+            <div id="modal-body"></div>
+            <button id="close-modal-btn" class="mt-6 w-full bg-stone-500 text-white font-bold py-2 px-4 rounded-md hover:bg-stone-600 transition-colors">Close</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const data = {
+                prevalence: {
+                    labels: ['Psychological', 'Physical', 'Sexual'],
+                    victimization: [67.9, 33.0, 32.5],
+                    perpetration: [65.3, 22.5, 25.1],
+                },
+                profiles: {
+                    labels: ['Psych Vic.', 'Psych Perp.', 'Phys Vic.', 'Phys Perp.', 'Sex Vic.', 'Sex Perp.'],
+                    data: {
+                        'cluster-1': { scores: [-0.85, -0.88, -0.65, -0.62, -0.45, -0.41], title: 'Profile: Low-Involvement', text: 'This is the largest group (45% of students), characterized by very low scores on all violence variables. Their relationships are largely non-violent and serve as a healthy baseline.' },
+                        'cluster-2': { scores: [1.55, -0.55, 1.20, -0.48, 1.15, -0.35], title: 'Profile: Asymmetrical Victim', text: 'Defined by high victimization but very low perpetration (20% of students, 85% female). This profile represents individuals in one-sidedly aggressive relationships and highlights the need for victim-centric support.' },
+                        'cluster-3': { scores: [0.95, 1.10, -0.40, -0.35, -0.30, -0.28], title: 'Profile: Mutual Psychological Aggressor', text: 'This group (25% of students) shows moderately high scores for both psychological victimization and perpetration, but low physical and sexual violence. It captures reciprocal patterns of emotional conflict.' },
+                        'cluster-4': { scores: [1.80, 1.75, 2.10, 2.05, 1.95, 1.85], title: 'Profile: Severe-Combined', text: 'The smallest but most concerning group (10% of students), with high scores across most violence variables. This represents the most volatile and dangerous relationships, with high levels of mutual aggression.' },
+                    }
+                },
+                predictors: {
+                    psychVic: { labels: ["Father's Ed. Level", 'Relationship Duration', "Mother's Ed. Level (Protective)"], values: [1.661, 1.529, 0.587] },
+                    physVic: { labels: ["Father's Ed. Level", 'Relationship Duration', "Mother's Ed. Level (Protective)"], values: [1.662, 1.229, 0.599] },
+                    sexVic: { labels: ["Father's Ed. Level", "Mother's Ed. Level (Protective)"], values: [1.503, 0.712] },
+                    physPerp: { labels: ['Gender (Male)', 'Relationship Duration'], values: [1.653, 1.228] },
+                    sexPerp: { labels: ['Gender (Male)', "Father's Ed. Level"], values: [1.991, 1.723] },
+                },
+                impact: {
+                    correlation: [
+                        { label: 'Psychological Victimization', data: [{ x: 0.75, y: 0.75, r: 68 }], backgroundColor: 'rgba(59, 130, 246, 0.7)'},
+                        { label: 'Physical Victimization', data: [{ x: 0.68, y: 0.68, r: 33 }], backgroundColor: 'rgba(239, 68, 68, 0.7)' },
+                        { label: 'Sexual Victimization', data: [{ x: 0.62, y: 0.62, r: 32.5 }], backgroundColor: 'rgba(139, 92, 246, 0.7)' },
+                    ],
+                    details: {
+                        labels: ['Lost Self-Confidence', 'Could Not Concentrate', 'Grades Dropped', 'Increased Fear/Anxiety'],
+                        values: [55, 48, 42, 65]
+                    }
+                },
+                solutions: {
+                    labels: ['Lowest', 'Low', 'Medium', 'High', 'Highest'],
+                    values: [0.85, 0.60, 0.35, 0.15, 0.05]
+                },
+                calculatorCoefficients: {
+                    psych: { intercept: 0.6562, gender: -0.1101, father_ed: 0.5075, mother_ed: -0.5330, duration: 0.4244 },
+                    phys: { intercept: -0.8064, gender: 0.4083, father_ed: 0.5078, mother_ed: -0.5128, duration: 0.2064 },
+                    sex: { intercept: -1.2763, gender: 0.2517, father_ed: 0.4075, mother_ed: -0.3390, duration: 0.1440 }
+                }
+            };
+
+            const colors = {
+                risk: 'rgba(239, 68, 68, 0.7)', // red-500
+                protective: 'rgba(22, 163, 74, 0.7)', // green-600
+                neutral: 'rgba(107, 114, 128, 0.6)', // gray-500
+                victimization: 'rgba(59, 130, 246, 0.8)', // blue-500
+                perpetration: 'rgba(249, 115, 22, 0.8)', // orange-500
+                negotiation: 'rgba(22, 163, 74, 0.8)', // green-600
+            };
+
+            let prevalenceChart, profilesChart, predictorsChart, impactCorrelationChart, impactDetailsChart, solutionsChart;
+
+            function createPrevalenceChart() {
+                const ctx = document.getElementById('prevalenceChart').getContext('2d');
+                prevalenceChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.prevalence.labels,
+                        datasets: [
+                            { label: 'Victimization (%)', data: data.prevalence.victimization, backgroundColor: colors.victimization },
+                            { label: 'Perpetration (%)', data: data.prevalence.perpetration, backgroundColor: colors.perpetration }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, title: { display: true, text: 'Prevalence (%)' } } },
+                        plugins: { title: { display: false }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${context.parsed.y}%` } } }
+                    }
+                });
+            }
+
+            function createProfilesChart() {
+                const ctx = document.getElementById('profilesChart').getContext('2d');
+                profilesChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: data.profiles.labels,
+                        datasets: [{
+                            label: 'Cluster Profile (Z-Score)',
+                            data: data.profiles.data['cluster-1'].scores,
+                            backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                            borderColor: 'rgba(249, 115, 22, 1)',
+                            pointBackgroundColor: 'rgba(249, 115, 22, 1)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { r: { suggestedMin: -1, suggestedMax: 2.2, pointLabels: { font: { size: 10 } }, ticks: { backdropColor: 'transparent', stepSize: 1 } } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+                updateProfileDescription('cluster-1');
+            }
+            
+            function createPredictorsChart() {
+                const ctx = document.getElementById('predictorsChart').getContext('2d');
+                const initialData = data.predictors.psychVic;
+                predictorsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: initialData.labels,
+                        datasets: [{
+                            label: 'Odds Ratio (OR)',
+                            data: initialData.values,
+                            backgroundColor: initialData.labels.map(l => l.includes('Protective') ? colors.protective : colors.risk),
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        scales: { x: { beginAtZero: false, title: { display: true, text: 'Odds Ratio (1 = No Effect)' }, ticks: { callback: (value) => value.toFixed(1) } } },
+                        plugins: { legend: { display: false },
+                            tooltip: { callbacks: { label: (context) => {
+                                const value = context.parsed.x;
+                                if (value < 1) return `Odds decreased by ${((1 - value) * 100).toFixed(1)}%`;
+                                return `Odds increased by ${((value - 1) * 100).toFixed(1)}%`;
+                            }}}
+                        }
+                    }
+                });
+            }
+
+            function createImpactCorrelationChart() {
+                const ctx = document.getElementById('impactCorrelationChart').getContext('2d');
+                impactCorrelationChart = new Chart(ctx, {
+                    type: 'bubble',
+                    data: { datasets: data.impact.correlation },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: true, text: 'Correlation & Prevalence' },
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: (context) => {
+                                const label = context.dataset.label || '';
+                                const correlation = context.parsed.x;
+                                const prevalence = context.raw.r;
+                                return `${label}: Correlation=${correlation.toFixed(2)}, Prevalence=${prevalence.toFixed(1)}%`;
+                            }}}
+                        },
+                        scales: { x: { title: { display: true, text: 'Correlation with Negative Impact' } }, y: { display: false } }
+                    }
+                });
+            }
+
+            function createImpactDetailsChart() {
+                const ctx = document.getElementById('impactDetailsChart').getContext('2d');
+                impactDetailsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.impact.details.labels,
+                        datasets: [{
+                            label: '% of Victims Reporting Impact',
+                            data: data.impact.details.values,
+                            backgroundColor: colors.neutral,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: true, text: 'Prevalence of Specific Impacts' },
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: (context) => `${context.parsed.x}% of victims reported this` } }
+                        },
+                        scales: { x: { title: { display: true, text: 'Prevalence (%)' } } }
+                    }
+                });
+            }
+
+            function createSolutionsChart() {
+                const ctx = document.getElementById('solutionsChart').getContext('2d');
+                solutionsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.solutions.labels,
+                        datasets: [{
+                            label: 'Likelihood of Violence',
+                            data: data.solutions.values,
+                            borderColor: colors.negotiation,
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            fill: true,
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Relative Likelihood of Violence' } },
+                            x: { title: { display: true, text: 'Negotiation Skill Level' } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            function updateProfileDescription(clusterId) {
+                const profile = data.profiles.data[clusterId];
+                document.getElementById('profile-title').textContent = profile.title;
+                document.getElementById('profile-text').textContent = profile.text;
+            }
+
+            function updatePredictorsChart(predictorKey) {
+                const chartData = data.predictors[predictorKey];
+                predictorsChart.data.labels = chartData.labels;
+                predictorsChart.data.datasets[0].data = chartData.values;
+                predictorsChart.data.datasets[0].backgroundColor = chartData.labels.map(l => l.includes('Protective') ? colors.protective : colors.risk);
+                predictorsChart.update();
+            }
+            
+            document.querySelectorAll('.cluster-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const clusterId = e.currentTarget.id;
+                    profilesChart.data.datasets[0].data = data.profiles.data[clusterId].scores;
+                    profilesChart.update();
+                    updateProfileDescription(clusterId);
+                    document.querySelectorAll('.cluster-card').forEach(c => c.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
+                });
+            });
+
+            document.getElementById('predictor-selector').addEventListener('change', (e) => {
+                updatePredictorsChart(e.target.value);
+            });
+            
+            let lastCalculatedRisk = null;
+            document.getElementById('calculate-risk-btn').addEventListener('click', () => {
+                const gender = parseFloat(document.getElementById('calc-gender').value);
+                const father_ed = parseFloat(document.getElementById('calc-father-ed').value);
+                const mother_ed = parseFloat(document.getElementById('calc-mother-ed').value);
+                const duration = parseFloat(document.getElementById('calc-duration').value);
+
+                const { psych, phys, sex } = data.calculatorCoefficients;
+
+                const calcLogOdds = (coeffs) => coeffs.intercept + (coeffs.gender * gender) + (coeffs.father_ed * father_ed) + (coeffs.mother_ed * mother_ed) + (coeffs.duration * duration);
+                
+                const psychLogOdds = calcLogOdds(psych);
+                const physLogOdds = calcLogOdds(phys);
+                const sexLogOdds = calcLogOdds(sex);
+
+                const getRiskLevel = (logOdds) => {
+                    const prob = 1 / (1 + Math.exp(-logOdds));
+                    if (prob < 0.33) return { level: 'Low', class: 'risk-low' };
+                    if (prob < 0.66) return { level: 'Moderate', class: 'risk-moderate' };
+                    return { level: 'High', class: 'risk-high' };
+                };
+
+                const psychRisk = getRiskLevel(psychLogOdds);
+                const physRisk = getRiskLevel(physLogOdds);
+                const sexRisk = getRiskLevel(sexLogOdds);
+                
+                lastCalculatedRisk = psychRisk.level;
+                if(physRisk.level === 'High' || sexRisk.level === 'High') lastCalculatedRisk = 'High';
+                else if(physRisk.level === 'Moderate' || sexRisk.level === 'Moderate') lastCalculatedRisk = 'Moderate';
+
+
+                document.getElementById('risk-psych').textContent = psychRisk.level;
+                document.getElementById('risk-psych').className = `text-lg font-bold ${psychRisk.class}`;
+                document.getElementById('risk-phys').textContent = physRisk.level;
+                document.getElementById('risk-phys').className = `text-lg font-bold ${physRisk.class}`;
+                document.getElementById('risk-sex').textContent = sexRisk.level;
+                document.getElementById('risk-sex').className = `text-lg font-bold ${sexRisk.class}`;
+
+                let implicationsText = '';
+                if (lastCalculatedRisk === 'High') {
+                    implicationsText = "Your profile suggests a high risk. It's crucial to be aware of relationship dynamics, recognize warning signs of control or aggression, and know that university counseling services are available. Prioritizing communication and mutual respect is key.";
+                } else if (lastCalculatedRisk === 'Moderate') {
+                    implicationsText = "Your profile suggests a moderate risk. This is a good time to be proactive about healthy relationships. Focus on building strong communication skills and setting clear boundaries with your partner. Consider attending workshops on healthy relationships if available.";
+                } else {
+                    implicationsText = "Your profile suggests a low risk. This is great! Continue to foster healthy relationship habits like open communication, mutual respect, and clear boundaries to maintain a positive and safe dating life.";
+                }
+                document.getElementById('risk-implications').innerHTML = `<p class="font-semibold">Implications & Recommendations:</p><p>${implicationsText}</p>`;
+                document.getElementById('find-support-btn').classList.remove('hidden');
+            });
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('main section[id]');
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').includes(current)) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            const modal = document.getElementById('gemini-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+
+            function showModal(title, content) {
+                modalTitle.textContent = title;
+                modalBody.innerHTML = content;
+                modal.classList.add('visible');
+            }
+
+            function hideModal() {
+                modal.classList.remove('visible');
+            }
+            
+            closeModalBtn.addEventListener('click', hideModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    hideModal();
+                }
+            });
+            
+            async function callGeminiAPI(prompt) {
+                const apiKey = ""; // API key will be injected by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: prompt }]
+                    }]
+                };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        console.error("Unexpected API response structure:", result);
+                        return "Sorry, I couldn't get a valid response. Please try again.";
+                    }
+                } catch (error) {
+                    console.error("Error calling Gemini API:", error);
+                    return "An error occurred while fetching data. Please check the console for details.";
+                }
+            }
+
+            document.getElementById('generate-phrases-btn').addEventListener('click', async () => {
+                const scenario = document.getElementById('scenario-selector').value;
+                let scenarioText = '';
+                if (scenario === 'jealousy') scenarioText = 'My partner is jealous of my friends';
+                if (scenario === 'disagreement') scenarioText = 'We had a disagreement about future plans';
+                if (scenario === 'criticism') scenarioText = 'My partner criticized my appearance';
+
+                const prompt = `You are a relationship counselor. A university student is in a conflict with their partner. The situation is: "${scenarioText}". Generate three different examples of calm, respectful, and non-accusatory phrases the student can use to start a conversation about this issue. Use 'I' statements. Format the output as a numbered list within HTML list tags (<li>).`;
+                
+                showModal('AI-Generated Phrases', '<div class="loader mx-auto"></div><p class="text-center mt-2">Generating advice...</p>');
+                const responseText = await callGeminiAPI(prompt);
+                showModal('AI-Generated Phrases', `<p class="mb-4">Here are some ways you could start the conversation:</p><ul class="list-disc list-inside space-y-2">${responseText}</ul>`);
+            });
+
+            document.getElementById('find-support-btn').addEventListener('click', async () => {
+                if (!lastCalculatedRisk) return;
+
+                const prompt = `A university student in Accra, Ghana has been identified as having a ${lastCalculatedRisk} risk of experiencing dating violence. Based on their situation, generate a supportive message and a list of 3-4 specific, actionable resources available to students at the University of Ghana or in Accra. Include contact information for the University Counseling Centre and one external NGO like the Ark Foundation or DOVVSU. Frame the response as encouraging and non-judgmental. Format the entire output in HTML, using headings (<h4>) for sections and unordered lists (<ul>) for the resources.`;
+                
+                showModal('Support Resources', '<div class="loader mx-auto"></div><p class="text-center mt-2">Finding resources...</p>');
+                const responseText = await callGeminiAPI(prompt);
+                showModal('Support Resources', responseText);
+            });
+
+
+            createPrevalenceChart();
+            createProfilesChart();
+            createPredictorsChart();
+            createImpactCorrelationChart();
+            createImpactDetailsChart();
+            createSolutionsChart();
+        });
+    </script>
+</body>
+</html>
